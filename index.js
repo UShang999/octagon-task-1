@@ -1,43 +1,60 @@
 const express = require('express');
+const mysql = require('mysql2');
 const app = express();
 const PORT = 3000;
 
-app.get('/', (req, res) => {
-    res.send('<h1>Привет, Октагон!</h1>');
+// Настройка подключения к БД
+const connection = mysql.createConnection({
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "ChatBotTests"
 });
 
-// 1. Статический роут (просто возвращает JSON)
-app.get('/static', (req, res) => {
-    res.json({
-        header: "Hello",
-        body: "Octagon NodeJS Test"
-    });
+// 1. Получить все элементы (GET)
+app.get('/getAllItems', (req, res) => {
+  connection.query("SELECT * FROM Items", (err, results) => {
+    if (err) return res.json(null);
+    res.json(results);
+  });
 });
 
-// 2. Динамический роут с расчетами
-app.get('/dynamic', (req, res) => {
-    // Получаем переменные из req.query
-    const { a, b, c } = req.query;
+// 2. Добавить элемент (POST)
+app.post('/addItem', (req, res) => {
+  const { name, desc } = req.query;
+  if (!name || !desc) return res.json(null);
 
-    // Превращаем их в числа
-    const numA = parseFloat(a);
-    const numB = parseFloat(b);
-    const numC = parseFloat(c);
+  connection.query("INSERT INTO Items (name, `desc`) VALUES (?, ?)", [name, desc], (err, result) => {
+    if (err) return res.json(null);
+    // Возвращаем созданный объект
+    res.json({ id: result.insertId, name, desc });
+  });
+});
 
-    // Проверяем: все ли переменные есть и являются ли они числами
-    if (isNaN(numA) || isNaN(numB) || isNaN(numC)) {
-        return res.json({ header: "Error" });
-    }
+// 3. Удалить элемент (POST)
+app.post('/deleteItem', (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.json(null);
 
-    // Считаем по формуле: (a * b * c) / 3
-    const result = (numA * numB * numC) / 3;
+  connection.query("DELETE FROM Items WHERE id = ?", [id], (err, result) => {
+    if (err) return res.json(null);
+    if (result.affectedRows === 0) return res.json({});
+    res.json({ message: "Deleted", id });
+  });
+});
 
-    res.json({
-        header: "Calculated",
-        body: String(result) // Возвращаем как строку, чтобы соответствовать формату
-    });
+// 4. Обновить элемент (POST)
+app.post('/updateItem', (req, res) => {
+  const { id, name, desc } = req.query;
+  if (!id || !name || !desc) return res.json(null);
+
+  connection.query("UPDATE Items SET name = ?, `desc` = ? WHERE id = ?", [name, desc, id], (err, result) => {
+    if (err) return res.json(null);
+    if (result.affectedRows === 0) return res.json({});
+    res.json({ id, name, desc });
+  });
 });
 
 app.listen(PORT, () => {
-    console.log(`Сервер работает на http://localhost:${PORT}`);
+  console.log(`Сервер с БД запущен на http://localhost:${PORT}`);
 });
